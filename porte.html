@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>Porte — Nota Okuma</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&family=Fraunces:ital,wght@1,450;1,560&family=Noto+Music&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1a1822;
+    --paper:#efe9d8;
+    --paper-dim:#9d97a8;
+    --panel:#221f2b;
+    --panel-2:#2a2735;
+    --line:#3a3648;
+    --accent-gold:#d4a94f;
+    --accent-sage:#84a978;
+    --accent-rust:#c26a52;
+    --radius:18px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; height:100%; background:var(--ink); overscroll-behavior:none;}
+  body{
+    font-family:'Manrope', sans-serif;
+    color:var(--paper);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    min-height:100dvh;
+    padding:20px 16px 28px;
+  }
+  .wrap{width:100%; max-width:460px;}
+
+  header{
+    display:flex; align-items:baseline; justify-content:space-between;
+    margin-bottom:18px;
+  }
+  .logo{
+    font-family:'Sora', sans-serif; font-weight:700; font-size:24px;
+    letter-spacing:-0.01em; color:var(--paper);
+  }
+  .logo::after{
+    content:''; display:inline-block; width:6px; height:6px; border-radius:50%;
+    background:var(--accent-gold); margin-left:6px; transform:translateY(-10px);
+  }
+  .streak{
+    font-family:'IBM Plex Mono', monospace; font-size:12.5px; color:var(--paper-dim);
+    display:flex; align-items:center; gap:6px;
+  }
+  .streak b{color:var(--accent-gold); font-size:16px;}
+
+  .controls{display:flex; gap:8px; margin-bottom:14px;}
+  .seg{
+    position:relative; display:flex; flex:1; background:var(--panel);
+    border-radius:12px; padding:3px; border:1px solid var(--line);
+  }
+  .seg button{
+    flex:1; position:relative; z-index:2; border:0; background:transparent;
+    color:var(--paper-dim); font-family:'Manrope', sans-serif; font-size:13px;
+    font-weight:600; padding:9px 4px; border-radius:9px; cursor:pointer;
+    transition:color .25s ease;
+  }
+  .seg button.active{color:var(--ink);}
+  .seg .thumb{
+    position:absolute; top:3px; bottom:3px; left:3px; width:calc(50% - 3px);
+    background:var(--paper); border-radius:9px; z-index:1;
+    transition:transform .32s cubic-bezier(.65,0,.35,1);
+  }
+  .seg.two .thumb.pos-1{transform:translateX(100%);}
+
+  .staff-card{
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+    padding:26px 14px 18px; margin-bottom:16px;
+    box-shadow:0 30px 60px -30px rgba(0,0,0,.6);
+    transition:box-shadow .35s ease, border-color .35s ease;
+  }
+  .staff-card.flash-correct{ border-color:var(--accent-sage); box-shadow:0 0 0 3px rgba(132,169,120,.18), 0 30px 60px -30px rgba(0,0,0,.6); }
+  .staff-card.flash-wrong{ border-color:var(--accent-rust); box-shadow:0 0 0 3px rgba(194,106,82,.18), 0 30px 60px -30px rgba(0,0,0,.6); }
+
+  svg#staff{width:100%; height:auto; display:block; overflow:visible;}
+  .staff-line{stroke:var(--paper); stroke-width:1.4; opacity:0;}
+  .ledger{stroke:var(--paper-dim); stroke-width:1.6;}
+  .clef-glyph{ fill:var(--paper); font-family:'Noto Music','Segoe UI Symbol','Apple Symbols',sans-serif; dominant-baseline:alphabetic; }
+
+  .note-head{
+    fill:var(--paper); stroke:var(--paper); stroke-width:1;
+  }
+  .note-stem{stroke:var(--paper); stroke-width:2.2;}
+  .note-group.correct .note-head{fill:var(--accent-sage); stroke:var(--accent-sage);}
+  .note-group.wrong .note-head{fill:var(--accent-rust); stroke:var(--accent-rust);}
+  .note-group.correct .note-stem{stroke:var(--accent-sage);}
+  .note-group.wrong .note-stem{stroke:var(--accent-rust);}
+  .note-group.wrong{ animation:shake .38s ease; }
+  @keyframes shake{
+    0%,100%{transform:translateX(0);}
+    20%{transform:translateX(-6px);}
+    40%{transform:translateX(5px);}
+    60%{transform:translateX(-3px);}
+    80%{transform:translateX(2px);}
+  }
+  /* SVG'de scale/rotate varsayılan olarak (0,0) orijinine göre uygulanır;
+     nota merkezden uzakta (x:340) olduğu için ölçekleme notayı yanlışlıkla
+     kaydırıyordu ("zıplama" hissi buradan geliyordu). fill-box + center ile
+     dönüşüm orijinini notanın kendi merkezine sabitliyoruz. */
+  .note-group{ transform-box: fill-box; transform-origin: center; }
+  .note-group.settle{ animation:settle .42s cubic-bezier(.34,1.56,.64,1); }
+  @keyframes settle{
+    0%{transform:translateY(-14px); opacity:0;}
+    60%{transform:translateY(3px); opacity:1;}
+    100%{transform:translateY(0); opacity:1;}
+  }
+  .note-group.correct{ animation:pulseCorrect .46s cubic-bezier(.34,1.4,.4,1); }
+  @keyframes pulseCorrect{
+    0%{transform:scale(1);}
+    45%{transform:scale(1.1);}
+    100%{transform:scale(1);}
+  }
+  .note-group.leaving{ animation:leave .22s ease forwards; }
+  @keyframes leave{ to{ transform:translateX(-24px); opacity:0; } }
+
+  .icon-mark{ opacity:0; }
+  .icon-mark path{
+    fill:none; stroke-width:3.2; stroke-linecap:round; stroke-linejoin:round;
+    stroke-dasharray:24; stroke-dashoffset:24;
+  }
+  .icon-mark.show{ opacity:1; }
+  .icon-mark.show path{ animation:draw .32s ease forwards .05s; }
+  @keyframes draw{ to{ stroke-dashoffset:0; } }
+
+  .answer-label{
+    display:flex; align-items:center; justify-content:center; gap:6px;
+    text-align:center; font-family:'IBM Plex Mono', monospace; font-size:12.5px;
+    letter-spacing:.04em; color:var(--paper-dim); min-height:22px; margin-bottom:14px;
+  }
+  .answer-label.correct{color:var(--accent-sage);}
+  .answer-label.wrong{color:var(--accent-rust);}
+
+  .keys{
+    display:flex; flex-wrap:wrap; gap:10px; justify-content:center;
+  }
+  .key{
+    position:relative; overflow:hidden; flex:1 1 calc(25% - 8px); min-width:78px;
+    background:var(--panel-2); border:1.5px solid var(--line); border-radius:16px;
+    color:var(--paper); font-family:'Manrope', sans-serif; font-weight:600; font-size:15px;
+    padding:16px 0; cursor:pointer; user-select:none;
+    transition:transform .12s ease, border-color .22s ease, background .22s ease;
+  }
+  .key:active{transform:scale(.94);}
+  .key .blot{
+    position:absolute; inset:0; border-radius:50%; background:var(--accent-gold);
+    transform:scale(0); opacity:.5; pointer-events:none;
+  }
+  .key.pressed .blot{ animation:blot .5s ease-out forwards; }
+  @keyframes blot{ to{ transform:scale(2.8); opacity:0; } }
+  .key.k-correct{ background:rgba(132,169,120,.16); border-color:var(--accent-sage); color:var(--accent-sage); }
+  .key.k-wrong{ background:rgba(194,106,82,.16); border-color:var(--accent-rust); color:var(--accent-rust); animation:shake .38s ease; }
+  .key.k-reveal{ border-color:var(--accent-gold); animation:revealPulse 1s ease 2; }
+  @keyframes revealPulse{
+    0%,100%{ box-shadow:0 0 0 0 rgba(212,169,79,0); }
+    50%{ box-shadow:0 0 0 4px rgba(212,169,79,.22); }
+  }
+  .key span{ position:relative; z-index:2; }
+
+  .hidden{display:none !important;}
+
+  .home-title{
+    font-family:'Fraunces', serif; font-style:italic; font-weight:450; font-size:17px;
+    color:var(--paper-dim); margin:2px 0 14px; letter-spacing:.005em;
+  }
+  .mode-card{
+    display:flex; align-items:center; gap:14px; width:100%;
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+    padding:18px; margin-bottom:14px; cursor:pointer; text-align:left;
+    transition:border-color .2s ease, transform .12s ease;
+  }
+  .mode-card:active{transform:scale(.98);}
+  .mode-card:hover{border-color:var(--accent-gold);}
+  .mode-icon{
+    flex:0 0 auto; width:46px; height:46px; border-radius:14px;
+    display:flex; align-items:center; justify-content:center;
+    background:var(--panel-2); font-size:22px;
+  }
+  .mode-card.free .mode-icon{color:var(--accent-sage);}
+  .mode-card.curric .mode-icon{color:var(--accent-gold);}
+  .mode-icon svg{width:24px; height:24px; display:block;}
+  .mode-body h3{margin:0 0 3px; font-family:'Sora', sans-serif; font-size:16px; color:var(--paper);}
+  .mode-body p{margin:0; font-size:12.5px; color:var(--paper-dim); line-height:1.4;}
+
+  .subheader{
+    display:flex; align-items:center; gap:10px; margin-bottom:16px;
+  }
+  .back-btn{
+    flex:0 0 auto; width:34px; height:34px; border-radius:10px; border:1px solid var(--line);
+    background:var(--panel); color:var(--paper); font-size:16px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .back-btn:active{transform:scale(.92);}
+  .subheader h2{
+    margin:0; font-family:'Sora', sans-serif; font-size:16px; font-weight:600; color:var(--paper);
+  }
+
+  .clef-group-title{
+    font-family:'Fraunces', serif; font-style:italic; font-weight:450; font-size:15px;
+    color:var(--paper-dim); letter-spacing:.005em; margin:18px 0 8px;
+  }
+  .clef-group-title:first-child{margin-top:0;}
+
+  .lesson-row{
+    display:flex; align-items:center; gap:12px; width:100%;
+    background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    padding:13px 14px; margin-bottom:8px; cursor:pointer; text-align:left;
+  }
+  .lesson-row:active{transform:scale(.98);}
+  .lesson-row.locked{opacity:.45; cursor:not-allowed;}
+  .lesson-num{
+    flex:0 0 auto; width:30px; height:30px; border-radius:9px; background:var(--panel-2);
+    display:flex; align-items:center; justify-content:center;
+    font-family:'IBM Plex Mono', monospace; font-size:12.5px; color:var(--paper-dim);
+  }
+  .lesson-row.done .lesson-num{background:rgba(132,169,120,.2); color:var(--accent-sage);}
+  .lesson-info{flex:1; min-width:0;}
+  .lesson-info h4{margin:0 0 2px; font-size:14px; font-weight:600; color:var(--paper);}
+  .lesson-info p{margin:0; font-size:11.5px; color:var(--paper-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .lesson-check{flex:0 0 auto; color:var(--accent-sage); display:flex;}
+  .lesson-check svg{width:15px; height:15px;}
+  .lesson-lock{flex:0 0 auto; color:var(--paper-dim); display:flex;}
+  .lesson-lock svg{width:14px; height:14px;}
+
+  .lesson-progress-wrap{
+    display:flex; align-items:center; gap:10px; margin-bottom:14px;
+  }
+  .lesson-progress-track{
+    flex:1; height:7px; background:var(--panel); border:1px solid var(--line); border-radius:6px; overflow:hidden;
+  }
+  .lesson-progress-fill{
+    height:100%; width:0%; background:var(--accent-gold); border-radius:6px;
+    transition:width .3s ease;
+  }
+  .lesson-progress-num{
+    font-family:'IBM Plex Mono', monospace; font-size:12px; color:var(--paper-dim); flex:0 0 auto;
+  }
+
+  .lesson-result{
+    position:fixed; inset:0; background:rgba(26,24,34,.88); backdrop-filter:blur(2px);
+    display:flex; align-items:center; justify-content:center; z-index:20; padding:20px;
+  }
+  .lesson-result-card{
+    width:100%; max-width:400px; background:var(--panel); border:1px solid var(--line);
+    border-radius:var(--radius); padding:28px 22px; text-align:center;
+  }
+  .lesson-result-card .badge{
+    width:56px; height:56px; border-radius:50%; margin:0 auto 14px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .lesson-result-card .badge svg{width:27px; height:27px;}
+  .lesson-result-card.pass .badge{background:rgba(132,169,120,.18); color:var(--accent-sage);}
+  .lesson-result-card.fail .badge{background:rgba(194,106,82,.18); color:var(--accent-rust);}
+  .lesson-result-card h3{margin:0 0 6px; font-family:'Sora', sans-serif; font-size:18px; color:var(--paper);}
+  .lesson-result-card p{margin:0 0 20px; font-size:13px; color:var(--paper-dim);}
+  .result-actions{display:flex; gap:10px;}
+  .result-actions button{
+    flex:1; padding:12px 0; border-radius:12px; border:1px solid var(--line);
+    font-family:'Manrope', sans-serif; font-weight:600; font-size:13.5px; cursor:pointer;
+  }
+  .result-actions .primary{background:var(--accent-gold); color:var(--ink); border-color:var(--accent-gold);}
+  .result-actions .secondary{background:transparent; color:var(--paper);}
+
+  [data-screen].screen-in{ animation: screenIn .34s cubic-bezier(.32,.72,.35,1) both; }
+  [data-screen].screen-out{ animation: screenOut .18s ease both; }
+  @keyframes screenIn{
+    from{ opacity:0; transform:translateY(12px) scale(.985); }
+    to{ opacity:1; transform:translateY(0) scale(1); }
+  }
+  @keyframes screenOut{
+    from{ opacity:1; transform:translateY(0) scale(1); }
+    to{ opacity:0; transform:translateY(-8px) scale(.985); }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:.001s !important; transition-duration:.001s !important;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="logo">Porte</div>
+    <div class="streak" id="streakWrap">seri <b id="streakNum">0</b></div>
+  </header>
+
+  <!-- HOME SCREEN -->
+  <div id="screenHome" data-screen>
+    <div class="home-title">Bir mod seç</div>
+    <button class="mode-card free" id="goFree">
+      <div class="mode-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <ellipse cx="7" cy="18" rx="3.4" ry="2.6" transform="rotate(-18 7 18)" fill="currentColor" stroke="none"/>
+          <line x1="10.2" y1="16.6" x2="10.2" y2="4"/>
+          <path d="M10.2 4 C 14 5.2, 15.6 8.2, 14.6 11.8"/>
+        </svg>
+      </div>
+      <div class="mode-body">
+        <h3>Serbest mod</h3>
+        <p>Anahtar ve zorluk seç, rastgele notaları oku.</p>
+      </div>
+    </button>
+    <button class="mode-card curric" id="goCurric">
+      <div class="mode-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 6.5 C10 5 7 4.5 4 5 V18 C7 17.5 10 18 12 19.5"/>
+          <path d="M12 6.5 C14 5 17 4.5 20 5 V18 C17 17.5 14 18 12 19.5"/>
+          <line x1="12" y1="6.5" x2="12" y2="19.5"/>
+        </svg>
+      </div>
+      <div class="mode-body">
+        <h3>Müfredat</h3>
+        <p>Sıfırdan başla, ders ders ilerle, notaları öğren.</p>
+      </div>
+    </button>
+  </div>
+
+  <!-- FREE MODE SCREEN -->
+  <div id="screenFree" class="hidden" data-screen>
+    <div class="subheader">
+      <button class="back-btn" data-home>‹</button>
+      <h2>Serbest mod</h2>
+    </div>
+
+    <div class="controls">
+      <div class="seg two" id="clefSeg">
+        <div class="thumb pos-0"></div>
+        <button data-clef="treble" class="active">Sol anahtarı</button>
+        <button data-clef="bass">Fa anahtarı</button>
+      </div>
+    </div>
+    <div class="controls">
+      <div class="seg two" id="diffSeg">
+        <div class="thumb pos-0"></div>
+        <button data-diff="easy" class="active">Porte içi</button>
+        <button data-diff="hard">Yardımcı çizgili</button>
+      </div>
+    </div>
+
+    <div class="staff-card" id="staffCardFree">
+      <svg id="staffFree" viewBox="0 0 600 230"></svg>
+    </div>
+    <div class="answer-label" id="answerLabelFree">&nbsp;</div>
+    <div class="keys" id="keysFree"></div>
+  </div>
+
+  <!-- CURRICULUM LIST SCREEN -->
+  <div id="screenCurric" class="hidden" data-screen>
+    <div class="subheader">
+      <button class="back-btn" data-home>‹</button>
+      <h2>Müfredat</h2>
+    </div>
+    <div class="clef-group-title">Sol anahtarı</div>
+    <div id="lessonListTreble"></div>
+    <div class="clef-group-title">Fa anahtarı</div>
+    <div id="lessonListBass"></div>
+  </div>
+
+  <!-- LESSON PRACTICE SCREEN -->
+  <div id="screenLesson" class="hidden" data-screen>
+    <div class="subheader">
+      <button class="back-btn" data-curric>‹</button>
+      <h2 id="lessonTitle">Ders</h2>
+    </div>
+    <div class="lesson-progress-wrap">
+      <div class="lesson-progress-track"><div class="lesson-progress-fill" id="lessonProgressFill"></div></div>
+      <div class="lesson-progress-num" id="lessonProgressNum">0/10</div>
+    </div>
+
+    <div class="staff-card" id="staffCardLesson">
+      <svg id="staffLesson" viewBox="0 0 600 230"></svg>
+    </div>
+    <div class="answer-label" id="answerLabelLesson">&nbsp;</div>
+    <div class="keys" id="keysLesson"></div>
+  </div>
+
+</div>
+
+<script>
+const NS = "http://www.w3.org/2000/svg";
+const STEP = 16;
+const BOTTOM_Y = 170;
+const STAFF_X0 = 130, STAFF_X1 = 560;
+const CLEF_X = 95;
+
+const LETTERS = ["C","D","E","F","G","A","B"];
+const SOLFEGE = {C:"Do",D:"Re",E:"Mi",F:"Fa",G:"Sol",A:"La",B:"Si"};
+
+function buildRange(startLetter, startOctave, startStep, count){
+  let out = [];
+  let li = LETTERS.indexOf(startLetter);
+  let oct = startOctave;
+  let step = startStep;
+  for(let i=0;i<count;i++){
+    out.push({letter:LETTERS[li], octave:oct, step:step});
+    li++; step++;
+    if(li>6){ li=0; oct++; }
+  }
+  return out;
+}
+
+const TREBLE_ALL = buildRange("C",4,-2,13);
+const BASS_ALL = buildRange("E",2,-2,13);
+function easySubset(all){ return all.filter(n => n.step>=0 && n.step<=8); }
+
+let state = { clef:"treble", diff:"easy", streak:0, current:null, locked:false };
+
+function noteY(step){ return BOTTOM_Y - step*STEP; }
+function lineY(clefStep){ return BOTTOM_Y - clefStep*STEP; }
+
+function pool(){
+  const all = state.clef==="treble" ? TREBLE_ALL : BASS_ALL;
+  return state.diff==="easy" ? easySubset(all) : all;
+}
+function randomNote(){
+  const p = pool();
+  let n;
+  do{ n = p[Math.floor(Math.random()*p.length)]; }
+  while(state.current && n.letter===state.current.letter && n.octave===state.current.octave);
+  return n;
+}
+function el(tag, attrs){
+  const e = document.createElementNS(NS, tag);
+  for(const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+}
+
+function drawStaffLines(svg){
+  for(let i=0;i<5;i++){
+    const y = BOTTOM_Y - i*2*STEP;
+    const line = el("line",{x1:STAFF_X0-40,y1:y,x2:STAFF_X1,y2:y,class:"staff-line"});
+    svg.appendChild(line);
+    line.style.transition = `opacity .4s ease ${i*70}ms`;
+    requestAnimationFrame(()=> requestAnimationFrame(()=> line.style.opacity = 1));
+  }
+}
+
+// Treble and bass clefs are rendered using the real Unicode musical symbol
+// glyphs (𝄞 U+1D11E, 𝄢 U+1D122) via SVG <text>, instead of hand-drawn paths —
+// this guarantees a correctly-proportioned clef shape from an actual
+// typeface instead of an approximated vector drawing.
+function drawClef(svg, type){
+  const g = el("g", {class:"clef"});
+  if(type === "treble"){
+    // The G clef glyph's ring is designed to sit on the G4 line (step 2).
+    // Font metrics vary, so the glyph is nudged with dy to land the ring
+    // precisely on that line rather than trusting baseline placement alone.
+    const gy = lineY(2);
+    const t = el("text", {
+      x: CLEF_X, y: gy,
+      class: "clef-glyph",
+      "font-size": 128,
+      "text-anchor": "middle",
+      dy: "36"
+    });
+    t.textContent = "\uD834\uDD1E"; // 𝄞 MUSICAL SYMBOL G CLEF
+    g.appendChild(t);
+  } else {
+    // The F clef glyph's two dots straddle the F3 line (step 6).
+    const fy = lineY(6);
+    const t = el("text", {
+      x: CLEF_X, y: fy,
+      class: "clef-glyph",
+      "font-size": 92,
+      "text-anchor": "middle",
+      dy: "20"
+    });
+    t.textContent = "\uD834\uDD22"; // 𝄢 MUSICAL SYMBOL F CLEF
+    g.appendChild(t);
+  }
+  svg.appendChild(g);
+}
+
+function drawNote(svg, note, animateIn, eng){
+  const y = noteY(note.step);
+  const x = 340;
+  const g = el("g", {class:"note-group" + (animateIn ? " settle" : "")});
+
+  if(note.step <= -2){
+    for(let s=-2; s>=note.step; s-=2){
+      g.appendChild(el("line",{x1:x-18,y1:noteY(s),x2:x+18,y2:noteY(s),class:"ledger"}));
+    }
+  }
+  if(note.step >= 10){
+    for(let s=10; s<=note.step; s+=2){
+      g.appendChild(el("line",{x1:x-18,y1:noteY(s),x2:x+18,y2:noteY(s),class:"ledger"}));
+    }
+  }
+
+  const head = el("ellipse",{cx:x,cy:y,rx:11,ry:8,class:"note-head",transform:`rotate(-18 ${x} ${y})`});
+  g.appendChild(head);
+
+  // Stem must attach to the true edge of the *rotated* notehead, not the
+  // unrotated bounding box — otherwise it floats off the ellipse or cuts
+  // through it. Rotate the attachment point by the same -18deg the head uses.
+  const stemUp = note.step < 4;
+  const angle = -18 * Math.PI / 180;
+  const cos = Math.cos(angle), sin = Math.sin(angle);
+  // Edge point on the unrotated ellipse (rightmost for up-stem, leftmost for down-stem)
+  const localX = stemUp ? 10 : -10;
+  const localY = 0;
+  const stemX = x + (localX * cos - localY * sin);
+  const stemY1 = y + (localX * sin + localY * cos);
+  const stemY2 = stemUp ? stemY1 - 58 : stemY1 + 58;
+  g.appendChild(el("line",{x1:stemX,y1:stemY1,x2:stemX,y2:stemY2,class:"note-stem"}));
+
+  svg.appendChild(g);
+  eng.currentGroup = g;
+}
+
+// Small hand-drawn SVG icons used in place of emoji anywhere markup is
+// built as an HTML string (lesson list rows, lesson result badge).
+const ICON_CHECK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13 L10 18 L19 6"/></svg>';
+const ICON_LOCK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="11" width="13" height="9" rx="2"/><path d="M8.5 11 V8 a3.5 3.5 0 0 1 7 0 v3"/></svg>';
+const ICON_RETRY_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12 a7.5 7.5 0 1 1 2.5 5.6"/><path d="M4.5 17.2 V12 H9.7"/></svg>';
+
+function markIcon(kind){
+  // kind: "check" or "cross" — small hand-drawn svg mark, no emoji/glyphs
+  const svg = el("svg", {class:"icon-mark show", width:16, height:16, viewBox:"0 0 16 16"});
+  const path = kind === "check"
+    ? el("path",{d:"M3,9 L7,13 L13,3", stroke:"currentColor"})
+    : el("path",{d:"M4,4 L12,12 M12,4 L4,12", stroke:"currentColor"});
+  svg.appendChild(path);
+  return svg;
+}
+
+// ---- Reusable practice engine: powers both Serbest mod and each lesson ----
+function makeEngine({svgId, keysId, cardId, labelId, getPool, getClef, onResult}){
+  const svg = document.getElementById(svgId);
+  const keysWrap = document.getElementById(keysId);
+  const card = document.getElementById(cardId);
+  const label = document.getElementById(labelId);
+  const eng = { current:null, locked:false, currentGroup:null };
+
+  function randomNote(){
+    const p = getPool();
+    let n;
+    do{ n = p[Math.floor(Math.random()*p.length)]; }
+    while(p.length>1 && eng.current && n.letter===eng.current.letter && n.octave===eng.current.octave);
+    return n;
+  }
+
+  function newRound(animateIn){
+    const note = randomNote();
+    eng.current = note;
+    eng.locked = false;
+    drawNote(svg, note, animateIn, eng);
+    label.innerHTML = "&nbsp;";
+    label.className = "answer-label";
+    card.classList.remove("flash-correct","flash-wrong");
+    keysWrap.querySelectorAll(".key").forEach(k=> k.classList.remove("k-correct","k-wrong","k-reveal"));
+  }
+
+  function initStaff(){
+    svg.innerHTML = "";
+    drawStaffLines(svg);
+    drawClef(svg, getClef());
+    newRound(true);
+  }
+
+  function buildKeys(){
+    keysWrap.innerHTML = "";
+    LETTERS.forEach(letter=>{
+      const btn = document.createElement("button");
+      btn.className = "key";
+      btn.dataset.letter = letter;
+      btn.innerHTML = `<span class="blot"></span><span>${SOLFEGE[letter]}</span>`;
+      btn.addEventListener("click", ()=> handleAnswer(letter, btn));
+      keysWrap.appendChild(btn);
+    });
+  }
+
+  function handleAnswer(letter, btn){
+    if(eng.locked) return;
+    eng.locked = true;
+
+    const blot = btn.querySelector(".blot");
+    void blot.offsetWidth;
+    btn.classList.add("pressed");
+    setTimeout(()=>btn.classList.remove("pressed"), 500);
+
+    const correct = letter === eng.current.letter;
+    const correctBtn = keysWrap.querySelector(`.key[data-letter="${eng.current.letter}"]`);
+
+    label.innerHTML = "";
+    if(correct){
+      eng.currentGroup.classList.add("correct");
+      card.classList.add("flash-correct");
+      btn.classList.add("k-correct");
+      label.appendChild(markIcon("check"));
+      label.appendChild(document.createTextNode(SOLFEGE[letter] + " doğru"));
+      label.classList.add("correct");
+    } else {
+      eng.currentGroup.classList.add("wrong");
+      card.classList.add("flash-wrong");
+      btn.classList.add("k-wrong");
+      if(correctBtn) correctBtn.classList.add("k-reveal");
+      label.appendChild(markIcon("cross"));
+      label.appendChild(document.createTextNode("cevap: " + SOLFEGE[eng.current.letter]));
+      label.classList.add("wrong");
+    }
+
+    if(onResult) onResult(correct);
+
+    setTimeout(()=>{
+      if(eng.currentGroup) eng.currentGroup.classList.add("leaving");
+      setTimeout(()=>{
+        if(eng.currentGroup) svg.removeChild(eng.currentGroup);
+        newRound(true);
+      }, 220);
+    }, correct ? 550 : 1000);
+  }
+
+  buildKeys();
+  return { initStaff };
+}
+
+function wireSegmented(id, attr, onChange){
+  const seg = document.getElementById(id);
+  const buttons = seg.querySelectorAll("button");
+  const thumb = seg.querySelector(".thumb");
+  buttons.forEach((b,i)=>{
+    b.addEventListener("click", ()=>{
+      buttons.forEach(x=>x.classList.remove("active"));
+      b.classList.add("active");
+      thumb.className = "thumb pos-" + i;
+      onChange(b.dataset[attr]);
+    });
+  });
+}
+
+// ================= SERBEST MOD =================
+const freeEngine = makeEngine({
+  svgId:"staffFree", keysId:"keysFree", cardId:"staffCardFree", labelId:"answerLabelFree",
+  getPool: ()=> pool(),
+  getClef: ()=> state.clef,
+  onResult: (correct)=>{
+    state.streak = correct ? state.streak+1 : 0;
+    document.getElementById("streakNum").textContent = state.streak;
+  }
+});
+
+wireSegmented("clefSeg","clef", (v)=>{ state.clef=v; freeEngine.initStaff(); });
+wireSegmented("diffSeg","diff", (v)=>{ state.diff=v; freeEngine.initStaff(); });
+
+// ================= MÜFREDAT (curriculum) =================
+const LESSON_QUESTIONS = 10;
+const LESSON_PASS = 8;
+
+// Index ranges are slices into TREBLE_ALL / BASS_ALL (13 notes each,
+// ordered low→high). Each lesson widens the range outward from the
+// clef's home line so notes are introduced gradually, ledger lines last.
+const LESSON_RANGES = [
+  [3,5], [2,6], [1,7], [0,8], [0,12]
+];
+
+function buildLessons(){
+  const list = [];
+  ["treble","bass"].forEach(clef=>{
+    const all = clef==="treble" ? TREBLE_ALL : BASS_ALL;
+    LESSON_RANGES.forEach((range, i)=>{
+      const notes = all.slice(range[0], range[1]+1);
+      list.push({
+        id: clef[0] + (i+1),
+        clef,
+        index: i+1,
+        notes,
+        label: notes.map(n=>SOLFEGE[n.letter]).filter((v,idx,a)=>a.indexOf(v)===idx).join(" – ")
+      });
+    });
+  });
+  return list;
+}
+const LESSONS = buildLessons();
+
+let progress = { done: [] };
+try{
+  const saved = JSON.parse(localStorage.getItem("porte_progress") || "null");
+  if(saved && Array.isArray(saved.done)) progress = saved;
+}catch(e){ /* localStorage unavailable — progress stays in-memory only */ }
+function saveProgress(){
+  try{ localStorage.setItem("porte_progress", JSON.stringify(progress)); }catch(e){}
+}
+function isDone(id){ return progress.done.includes(id); }
+function isUnlocked(lesson){
+  if(lesson.index===1) return true;
+  const prev = LESSONS.find(l=> l.clef===lesson.clef && l.index===lesson.index-1);
+  return prev ? isDone(prev.id) : true;
+}
+
+function renderLessonList(){
+  const trebleWrap = document.getElementById("lessonListTreble");
+  const bassWrap = document.getElementById("lessonListBass");
+  trebleWrap.innerHTML = ""; bassWrap.innerHTML = "";
+  LESSONS.forEach(lesson=>{
+    const wrap = lesson.clef==="treble" ? trebleWrap : bassWrap;
+    const unlocked = isUnlocked(lesson);
+    const done = isDone(lesson.id);
+    const row = document.createElement("button");
+    row.className = "lesson-row" + (done?" done":"") + (unlocked?"":" locked");
+    row.innerHTML = `
+      <div class="lesson-num">${lesson.index}</div>
+      <div class="lesson-info">
+        <h4>Ders ${lesson.index}</h4>
+        <p>${lesson.label} (${lesson.notes.length} nota)</p>
+      </div>
+      ${done ? `<div class="lesson-check">${ICON_CHECK_SVG}</div>` : (unlocked ? '' : `<div class="lesson-lock">${ICON_LOCK_SVG}</div>`)}
+    `;
+    if(unlocked) row.addEventListener("click", ()=> openLesson(lesson));
+    wrap.appendChild(row);
+  });
+}
+
+let currentLesson = null;
+let lessonScore = { correct:0, total:0 };
+
+const lessonEngine = makeEngine({
+  svgId:"staffLesson", keysId:"keysLesson", cardId:"staffCardLesson", labelId:"answerLabelLesson",
+  getPool: ()=> currentLesson.notes,
+  getClef: ()=> currentLesson.clef,
+  onResult: (correct)=>{
+    lessonScore.total++;
+    if(correct) lessonScore.correct++;
+    document.getElementById("lessonProgressNum").textContent = lessonScore.total + "/" + LESSON_QUESTIONS;
+    document.getElementById("lessonProgressFill").style.width = (lessonScore.total/LESSON_QUESTIONS*100) + "%";
+    if(lessonScore.total >= LESSON_QUESTIONS){
+      setTimeout(showLessonResult, 700);
+    }
+  }
+});
+
+function openLesson(lesson){
+  currentLesson = lesson;
+  lessonScore = { correct:0, total:0 };
+  document.getElementById("lessonTitle").textContent = "Ders " + lesson.index + " · " + (lesson.clef==="treble"?"Sol anahtarı":"Fa anahtarı");
+  document.getElementById("lessonProgressNum").textContent = "0/" + LESSON_QUESTIONS;
+  document.getElementById("lessonProgressFill").style.width = "0%";
+  lessonEngine.initStaff();
+  switchScreen("screenLesson");
+}
+
+function showLessonResult(){
+  const pass = lessonScore.correct >= LESSON_PASS;
+  if(pass && !isDone(currentLesson.id)){
+    progress.done.push(currentLesson.id);
+    saveProgress();
+  }
+  const overlay = document.createElement("div");
+  overlay.className = "lesson-result";
+  overlay.innerHTML = `
+    <div class="lesson-result-card ${pass?'pass':'fail'}">
+      <div class="badge">${pass ? ICON_CHECK_SVG : ICON_RETRY_SVG}</div>
+      <h3>${pass ? 'Dersi geçtin!' : 'Biraz daha pratik gerek'}</h3>
+      <p>${lessonScore.correct}/${lessonScore.total} doğru cevap${pass ? ' — bir sonraki ders açıldı.' : ` (geçmek için en az ${LESSON_PASS} gerekiyor).`}</p>
+      <div class="result-actions">
+        <button class="secondary" id="resToCurric">Ders listesi</button>
+        <button class="primary" id="resRetry">${pass ? 'Tekrar dene' : 'Tekrar dene'}</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  document.getElementById("resToCurric").addEventListener("click", ()=>{
+    overlay.remove();
+    renderLessonList();
+    switchScreen("screenCurric");
+  });
+  document.getElementById("resRetry").addEventListener("click", ()=>{
+    overlay.remove();
+    openLesson(currentLesson);
+  });
+}
+
+// ================= SCREEN ROUTING =================
+function switchScreen(name){
+  const target = document.getElementById(name);
+  const current = document.querySelector("[data-screen]:not(.hidden)");
+  document.getElementById("streakWrap").classList.toggle("hidden", name!=="screenFree");
+
+  if(!current || current === target){
+    document.querySelectorAll("[data-screen]").forEach(s=> s.classList.add("hidden"));
+    target.classList.remove("hidden");
+    target.classList.add("screen-in");
+    target.addEventListener("animationend", ()=> target.classList.remove("screen-in"), {once:true});
+    return;
+  }
+
+  current.classList.add("screen-out");
+  current.addEventListener("animationend", ()=>{
+    current.classList.remove("screen-out");
+    current.classList.add("hidden");
+    target.classList.remove("hidden");
+    target.classList.add("screen-in");
+    target.addEventListener("animationend", ()=> target.classList.remove("screen-in"), {once:true});
+  }, {once:true});
+}
+
+document.getElementById("goFree").addEventListener("click", ()=>{
+  freeEngine.initStaff();
+  switchScreen("screenFree");
+});
+document.getElementById("goCurric").addEventListener("click", ()=>{
+  renderLessonList();
+  switchScreen("screenCurric");
+});
+document.querySelectorAll("[data-home]").forEach(b=> b.addEventListener("click", ()=> switchScreen("screenHome")));
+document.querySelectorAll("[data-curric]").forEach(b=> b.addEventListener("click", ()=>{ renderLessonList(); switchScreen("screenCurric"); }));
+
+switchScreen("screenHome");
+</script>
+</body>
+</html>
