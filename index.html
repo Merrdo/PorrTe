@@ -4,6 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
 <title>Porte — Nota Okuma</title>
+<meta name="description" content="Sol ve fa anahtarında nota okuma pratiği ve müfredatı.">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1a1822">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Porte">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&family=Fraunces:ital,wght@1,450;1,560&family=Noto+Music&display=swap" rel="stylesheet">
 <style>
@@ -48,7 +57,7 @@
     font-family:'IBM Plex Mono', monospace; font-size:12.5px; color:var(--paper-dim);
     display:flex; align-items:center; gap:6px;
   }
-  .streak b{color:var(--accent-gold); font-size:16px;}
+  .streak b{color:var(--accent-gold); font-size:16px; font-family:'Manrope', sans-serif; font-variant-numeric:normal;}
 
   .controls{display:flex; gap:8px; margin-bottom:14px;}
   .seg{
@@ -78,15 +87,15 @@
   .staff-card.flash-correct{ border-color:var(--accent-sage); box-shadow:0 0 0 3px rgba(132,169,120,.18), 0 30px 60px -30px rgba(0,0,0,.6); }
   .staff-card.flash-wrong{ border-color:var(--accent-rust); box-shadow:0 0 0 3px rgba(194,106,82,.18), 0 30px 60px -30px rgba(0,0,0,.6); }
 
-  svg#staff{width:100%; height:auto; display:block; overflow:visible;}
-  .staff-line{stroke:var(--paper); stroke-width:1.4; opacity:0;}
-  .ledger{stroke:var(--paper-dim); stroke-width:1.6;}
+  svg[id^="staff"]{width:100%; height:auto; display:block; overflow:visible;}
+  .staff-line{stroke:var(--paper); stroke-width:1.4; opacity:0; shape-rendering:crispEdges;}
+  .ledger{stroke:var(--paper-dim); stroke-width:1.6; shape-rendering:crispEdges;}
   .clef-glyph{ fill:var(--paper); font-family:'Noto Music','Segoe UI Symbol','Apple Symbols',sans-serif; dominant-baseline:alphabetic; }
 
   .note-head{
-    fill:var(--paper); stroke:var(--paper); stroke-width:1;
+    fill:var(--paper); stroke:var(--paper); stroke-width:1; shape-rendering:geometricPrecision;
   }
-  .note-stem{stroke:var(--paper); stroke-width:2.2;}
+  .note-stem{stroke:var(--paper); stroke-width:2.2; shape-rendering:crispEdges;}
   .note-group.correct .note-head{fill:var(--accent-sage); stroke:var(--accent-sage);}
   .note-group.wrong .note-head{fill:var(--accent-rust); stroke:var(--accent-rust);}
   .note-group.correct .note-stem{stroke:var(--accent-sage);}
@@ -161,6 +170,44 @@
     50%{ box-shadow:0 0 0 4px rgba(212,169,79,.22); }
   }
   .key span{ position:relative; z-index:2; }
+
+  .theory-link{
+    display:flex; align-items:center; justify-content:space-between; width:100%;
+    background:var(--panel-2); border:1px solid var(--line); border-radius:12px;
+    padding:12px 14px; margin-bottom:10px; color:var(--accent-gold);
+    font-family:'Manrope', sans-serif; font-weight:600; font-size:13px;
+    cursor:pointer; text-align:left;
+  }
+  .theory-link:active{transform:scale(.98);}
+  .theory-link .chev{opacity:.7; font-family:'Manrope',sans-serif;}
+
+  .theory-card{
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+    padding:22px 8px 14px; margin-bottom:16px;
+    box-shadow:0 30px 60px -30px rgba(0,0,0,.6);
+  }
+  .theory-label{ font-family:'IBM Plex Mono', monospace; font-size:13px; font-weight:600; fill:var(--paper); }
+  .theory-label.space{ fill:var(--paper-dim); font-weight:500; }
+
+  .theory-body p{ margin:0 0 14px; font-size:13.5px; line-height:1.55; color:var(--paper-dim); }
+  .theory-body p.lead{ color:var(--paper); }
+  .theory-mnemonic{
+    display:flex; justify-content:space-between; align-items:center;
+    background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    padding:12px 14px; margin-bottom:10px;
+  }
+  .theory-mnemonic .lbl{ font-family:'Manrope', sans-serif; font-weight:600; font-size:12px; color:var(--paper-dim); }
+  .theory-mnemonic .val{ font-family:'Sora', sans-serif; font-weight:600; font-size:13.5px; color:var(--paper); text-align:right;}
+  .theory-tip{
+    font-family:'Fraunces', serif; font-style:italic; font-size:13px;
+    color:var(--accent-gold) !important; margin-top:2px;
+  }
+  .theory-cta{
+    width:100%; margin-top:8px; padding:14px 0; border-radius:14px;
+    border:1px solid var(--accent-gold); background:var(--accent-gold); color:var(--ink);
+    font-family:'Manrope', sans-serif; font-weight:700; font-size:14px; cursor:pointer;
+  }
+  .theory-cta:active{transform:scale(.97);}
 
   .hidden{display:none !important;}
 
@@ -357,8 +404,16 @@
       <h2>Müfredat</h2>
     </div>
     <div class="clef-group-title">Sol anahtarı</div>
+    <button class="theory-link" id="openTheoryTreble">
+      <span>Konu anlatımı: Sol anahtarı ne işe yarar, nasıl okunur?</span>
+      <span class="chev">›</span>
+    </button>
     <div id="lessonListTreble"></div>
     <div class="clef-group-title">Fa anahtarı</div>
+    <button class="theory-link" id="openTheoryBass">
+      <span>Konu anlatımı: Fa anahtarı ne işe yarar, nasıl okunur?</span>
+      <span class="chev">›</span>
+    </button>
     <div id="lessonListBass"></div>
   </div>
 
@@ -380,12 +435,24 @@
     <div class="keys" id="keysLesson"></div>
   </div>
 
+  <!-- THEORY / EXPLANATION SCREEN -->
+  <div id="screenTheory" class="hidden" data-screen>
+    <div class="subheader">
+      <button class="back-btn" data-curric>‹</button>
+      <h2 id="theoryTitle">Konu anlatımı</h2>
+    </div>
+    <div class="theory-card">
+      <svg id="staffTheory" viewBox="0 0 600 230"></svg>
+    </div>
+    <div class="theory-body" id="theoryBody"></div>
+  </div>
+
 </div>
 
 <script>
 const NS = "http://www.w3.org/2000/svg";
-const STEP = 16;
-const BOTTOM_Y = 170;
+const STEP = 13;
+const BOTTOM_Y = 158;
 const STAFF_X0 = 130, STAFF_X1 = 560;
 const CLEF_X = 95;
 
@@ -455,9 +522,9 @@ function drawClef(svg, type){
     const t = el("text", {
       x: CLEF_X, y: gy,
       class: "clef-glyph",
-      "font-size": 128,
+      "font-size": 104,
       "text-anchor": "middle",
-      dy: "36"
+      dy: "29"
     });
     t.textContent = "\uD834\uDD1E"; // 𝄞 MUSICAL SYMBOL G CLEF
     g.appendChild(t);
@@ -467,9 +534,9 @@ function drawClef(svg, type){
     const t = el("text", {
       x: CLEF_X, y: fy,
       class: "clef-glyph",
-      "font-size": 92,
+      "font-size": 75,
       "text-anchor": "middle",
-      dy: "20"
+      dy: "16"
     });
     t.textContent = "\uD834\uDD22"; // 𝄢 MUSICAL SYMBOL F CLEF
     g.appendChild(t);
@@ -482,32 +549,38 @@ function drawNote(svg, note, animateIn, eng){
   const x = 340;
   const g = el("g", {class:"note-group" + (animateIn ? " settle" : "")});
 
+  const headRx = 14, headRy = 10.2, ledgerHalf = 21, stemLen = 47;
+
   if(note.step <= -2){
     for(let s=-2; s>=note.step; s-=2){
-      g.appendChild(el("line",{x1:x-18,y1:noteY(s),x2:x+18,y2:noteY(s),class:"ledger"}));
+      g.appendChild(el("line",{x1:x-ledgerHalf,y1:noteY(s),x2:x+ledgerHalf,y2:noteY(s),class:"ledger"}));
     }
   }
   if(note.step >= 10){
     for(let s=10; s<=note.step; s+=2){
-      g.appendChild(el("line",{x1:x-18,y1:noteY(s),x2:x+18,y2:noteY(s),class:"ledger"}));
+      g.appendChild(el("line",{x1:x-ledgerHalf,y1:noteY(s),x2:x+ledgerHalf,y2:noteY(s),class:"ledger"}));
     }
   }
 
-  const head = el("ellipse",{cx:x,cy:y,rx:11,ry:8,class:"note-head",transform:`rotate(-18 ${x} ${y})`});
+  const head = el("ellipse",{cx:x,cy:y,rx:headRx,ry:headRy,class:"note-head",transform:`rotate(-18 ${x} ${y})`});
   g.appendChild(head);
 
   // Stem must attach to the true edge of the *rotated* notehead, not the
   // unrotated bounding box — otherwise it floats off the ellipse or cuts
   // through it. Rotate the attachment point by the same -18deg the head uses.
+  // The anchor is pulled a couple px inside the ellipse (rather than sitting
+  // exactly on its boundary) so the stem visually overlaps into the head —
+  // stroke antialiasing on two shapes that only just touch otherwise leaves
+  // a faint 1px seam at the join when viewed up close.
   const stemUp = note.step < 4;
   const angle = -18 * Math.PI / 180;
   const cos = Math.cos(angle), sin = Math.sin(angle);
-  // Edge point on the unrotated ellipse (rightmost for up-stem, leftmost for down-stem)
-  const localX = stemUp ? 10 : -10;
+  const overlap = 3;
+  const localX = stemUp ? (headRx - overlap) : -(headRx - overlap);
   const localY = 0;
   const stemX = x + (localX * cos - localY * sin);
   const stemY1 = y + (localX * sin + localY * cos);
-  const stemY2 = stemUp ? stemY1 - 58 : stemY1 + 58;
+  const stemY2 = stemUp ? stemY1 - stemLen : stemY1 + stemLen;
   g.appendChild(el("line",{x1:stemX,y1:stemY1,x2:stemX,y2:stemY2,class:"note-stem"}));
 
   svg.appendChild(g);
@@ -657,7 +730,7 @@ const LESSON_PASS = 8;
 // ordered low→high). Each lesson widens the range outward from the
 // clef's home line so notes are introduced gradually, ledger lines last.
 const LESSON_RANGES = [
-  [3,5], [2,6], [1,7], [0,8], [0,12]
+  [3,5], [2,6], [1,7], [0,8], [0,10], [0,12]
 ];
 
 function buildLessons(){
@@ -811,7 +884,89 @@ document.getElementById("goCurric").addEventListener("click", ()=>{
 document.querySelectorAll("[data-home]").forEach(b=> b.addEventListener("click", ()=> switchScreen("screenHome")));
 document.querySelectorAll("[data-curric]").forEach(b=> b.addEventListener("click", ()=>{ renderLessonList(); switchScreen("screenCurric"); }));
 
+// ================= KONU ANLATIMI (theory) =================
+const THEORY_CONTENT = {
+  treble: {
+    title: "Sol anahtarı nedir?",
+    usage: "Sol anahtarı (G anahtarı), orta Do'nun üzerindeki tiz notaları yazmak için kullanılır. Piyanoda sağ el, gitar, keman, flüt gibi çoğu tiz sesli çalgının notaları bu anahtarla yazılır.",
+    reading: "Anahtarın sarmal iç kısmı, porte üzerindeki alttan 2. çizgiyi sarar. Bu çizgi Sol (G4) notasını gösterir — anahtarın adı da buradan gelir. Diğer notalar bu noktadan yukarı ve aşağı doğru sırayla sayılarak bulunur.",
+    linesLabel: "Çizgiler (alttan üste)",
+    lines: "Mi – Sol – Si – Re – Fa",
+    spacesLabel: "Aralıklar (alttan üste)",
+    spaces: "Fa – La – Do – Mi",
+    tip: "Kolay ezber: aralardaki notalar alt alta okunduğunda “Fa-La-Do-Mi” sırasını verir."
+  },
+  bass: {
+    title: "Fa anahtarı nedir?",
+    usage: "Fa anahtarı (F anahtarı), orta Do'nun altındaki pes notaları yazmak için kullanılır. Piyanoda sol el, bas gitar, çello, trombon gibi pes sesli çalgıların notaları bu anahtarla yazılır.",
+    reading: "Anahtarın iki noktası, porte üzerindeki alttan 4. çizgiyi sarar. Bu çizgi Fa (F3) notasını gösterir — anahtarın adı da buradan gelir. Diğer notalar bu noktadan yukarı ve aşağı doğru sırayla sayılarak bulunur.",
+    linesLabel: "Çizgiler (alttan üste)",
+    lines: "Sol – Si – Re – Fa – La",
+    spacesLabel: "Aralıklar (alttan üste)",
+    spaces: "La – Do – Mi – Sol",
+    tip: "Kolay ezber: çizgilerdeki notalar alt alta okunduğunda “Sol-Si-Re-Fa-La” sırasını verir."
+  }
+};
+
+function noteNameForStep(clef, step){
+  const all = clef==="treble" ? TREBLE_ALL : BASS_ALL;
+  const n = all.find(x=> x.step===step);
+  return n ? SOLFEGE[n.letter] : "";
+}
+
+function drawTheoryDiagram(svg, clef){
+  svg.innerHTML = "";
+  drawStaffLines(svg);
+  drawClef(svg, clef);
+  const lineSteps = [0,2,4,6,8];
+  const spaceSteps = [1,3,5,7];
+  lineSteps.forEach(s=>{
+    const t = el("text",{x:STAFF_X1+10, y:noteY(s), class:"theory-label", "dominant-baseline":"middle"});
+    t.textContent = noteNameForStep(clef, s);
+    svg.appendChild(t);
+  });
+  spaceSteps.forEach(s=>{
+    const t = el("text",{x:STAFF_X1+10, y:noteY(s), class:"theory-label space", "dominant-baseline":"middle"});
+    t.textContent = noteNameForStep(clef, s);
+    svg.appendChild(t);
+  });
+}
+
+function openTheory(clef){
+  const data = THEORY_CONTENT[clef];
+  document.getElementById("theoryTitle").textContent = data.title;
+  const body = document.getElementById("theoryBody");
+  body.innerHTML = `
+    <p class="lead">${data.usage}</p>
+    <p>${data.reading}</p>
+    <div class="theory-mnemonic"><span class="lbl">${data.linesLabel}</span><span class="val">${data.lines}</span></div>
+    <div class="theory-mnemonic"><span class="lbl">${data.spacesLabel}</span><span class="val">${data.spaces}</span></div>
+    <p class="theory-tip">${data.tip}</p>
+    <button class="theory-cta" id="theoryCta">Pratik yapmaya başla</button>
+  `;
+  drawTheoryDiagram(document.getElementById("staffTheory"), clef);
+  document.getElementById("theoryCta").addEventListener("click", ()=>{
+    const lesson = LESSONS.find(l=> l.clef===clef && l.index===1);
+    openLesson(lesson);
+  });
+  switchScreen("screenTheory");
+}
+
+document.getElementById("openTheoryTreble").addEventListener("click", ()=> openTheory("treble"));
+document.getElementById("openTheoryBass").addEventListener("click", ()=> openTheory("bass"));
+
 switchScreen("screenHome");
+
+// ================= PWA: service worker kaydı =================
+// Not: Service worker yalnızca https:// (veya localhost) üzerinden çalışır.
+// Dosya doğrudan file:// olarak açılırsa kayıt sessizce atlanır — bu durumda
+// uygulama normal şekilde çalışmaya devam eder, sadece çevrimdışı önbellek
+// ve tam PWA kurulum davranışı devre dışı kalır.
+if("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")){
+  window.addEventListener("load", ()=>{
+    navigator.serviceWorker.register("./sw.js").catch(()=>{ /* sessiz geç */ });
+  });
+}
 </script>
 </body>
 </html>
