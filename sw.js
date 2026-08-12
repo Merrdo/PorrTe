@@ -1,4 +1,4 @@
-const CACHE_NAME = "porte-cache-v2";
+const CACHE_NAME = "porte-cache-v3";
 const APP_SHELL = [
   "./index.html",
   "./manifest.json",
