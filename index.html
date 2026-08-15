@@ -58,6 +58,11 @@
     display:flex; align-items:center; gap:6px;
   }
   .streak b{color:var(--accent-gold); font-size:16px; font-family:'Manrope', sans-serif; font-variant-numeric:normal;}
+  /* Serbest mod'da o oturumdaki seriyi değil, şimdiye kadarki en yüksek
+     seriyi (localStorage'da kalıcı) gösteren küçük "rekor" etiketi —
+     ana seri sayısından ayırt edilsin diye daha soluk ve küçük. */
+  .streak-best{ display:inline-flex; align-items:center; gap:4px; margin-left:2px; opacity:.65; font-size:11px; }
+  .streak-best b{ color:var(--paper-dim); font-size:13px; font-family:'Manrope', sans-serif; }
 
   .controls{display:flex; gap:8px; margin-bottom:14px;}
   .seg{
@@ -512,6 +517,15 @@
   .settings-row .dk-text h4{ margin:0 0 2px; font-size:13px; font-weight:600; color:var(--paper); }
   .settings-row .dk-text p{ margin:0; font-size:11.5px; color:var(--paper-dim); line-height:1.4; }
   .settings-row.column{ flex-direction:column; align-items:stretch; gap:12px; }
+  #settingsResetRow{ border-color:rgba(194,106,82,.35); }
+  .reset-progress-btn{
+    flex:0 0 auto; border:1.5px solid var(--accent-rust); background:transparent;
+    color:var(--accent-rust); font-family:'Manrope', sans-serif; font-weight:700;
+    font-size:12.5px; padding:9px 14px; border-radius:10px; cursor:pointer;
+    transition:transform .12s ease, background .2s ease, color .2s ease;
+  }
+  .reset-progress-btn:active{ transform:scale(.94); }
+  .reset-progress-btn.confirming{ background:var(--accent-rust); color:var(--ink); }
   .seg.three .thumb{ width:calc(33.333% - 4px); }
   .seg.three .thumb.pos-1{ transform:translateX(100%); }
   .seg.three .thumb.pos-2{ transform:translateX(200%); }
@@ -758,7 +772,7 @@
   <header>
     <div class="logo">Porte</div>
     <div class="header-actions">
-      <div class="streak" id="streakWrap">seri <b id="streakNum">0</b></div>
+      <div class="streak" id="streakWrap">seri <b id="streakNum">0</b> <span class="streak-best">rekor <b id="streakBestNum">0</b></span></div>
       <button class="settings-btn" id="openSettings" type="button" aria-label="Ayarlar">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="3"></circle>
@@ -889,6 +903,21 @@
         </div>
       </div>
       <button class="dk-switch" id="settingsTipsSwitch" aria-label="Ders ipuçlarını aç/kapat"></button>
+    </div>
+    <div class="settings-row" id="settingsResetRow">
+      <div class="dk-label">
+        <div class="dk-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 12a9 9 0 1 0 3-6.7"/>
+            <polyline points="3 3 3 8 8 8"/>
+          </svg>
+        </div>
+        <div class="dk-text">
+          <h4>İlerlemeyi sıfırla</h4>
+          <p>Tamamlanan tüm dersleri ve en yüksek seri rekorunu siler; bu işlem geri alınamaz</p>
+        </div>
+      </div>
+      <button class="reset-progress-btn" id="settingsResetBtn" type="button">Sıfırla</button>
     </div>
   </div>
 
@@ -1333,9 +1362,16 @@ function noteFrequencyShifted(letter, octave, shift){
 function instrumentTone(freq, duration, delay, volume){
   const instrument = appSettings.noteSound;
   const velocity = Math.min((volume===undefined?0.22:volume) * 3.2, 0.85);
-  if(instrument === "piano") playPianoTone(freq, Math.max(duration*1.9, 0.9), delay, velocity);
-  else if(instrument === "guitar") playGuitarTone(freq, Math.max(duration*2.1, 0.9), delay, velocity);
-  else playTone(freq, duration, delay, volume);
+  // "Varsayılan" (default) artık ince/yapay bir sinüs biple değil, Piyano
+  // Dersleri modülüyle aynı gerçek kayıtlı piyano örneğiyle (Soundfont
+  // acoustic_grand_piano) çalıyor — kullanıcı Ayarlar'dan hiç dokunmasa
+  // bile nota sesi baştan itibaren gerçekçi olsun diye. "guitar" seçili
+  // değilse (yani "default" ya da "piano") hep bu gerçekçi piyano yolunu
+  // kullanıyoruz; saf sinüs (playTone) artık yalnızca playPianoTone içeride
+  // Soundfont'u yükleyemezse (çevrimdışı/CDN erişilemez durum) otomatik
+  // düşülen yedek (playPianoToneSynth) öncesi bir ihtimal olarak kalıyor.
+  if(instrument === "guitar") playGuitarTone(freq, Math.max(duration*2.1, 0.9), delay, velocity);
+  else playPianoTone(freq, Math.max(duration*1.9, 0.9), delay, velocity);
 }
 function playNoteSound(note){ instrumentTone(noteFrequency(note.letter, note.octave), 0.55, 0, 0.22); }
 // Dinle butonu birden fazla ders motoru arasında (pitch/triole/senkop/
@@ -2086,6 +2122,7 @@ const freeEngine = makeEngine({
   onResult: (correct)=>{
     state.streak = correct ? state.streak+1 : 0;
     document.getElementById("streakNum").textContent = state.streak;
+    registerStreak(state.streak);
   }
 });
 
@@ -2713,6 +2750,45 @@ function saveProgress(){
   try{ localStorage.setItem("porte_progress", JSON.stringify(progress)); }catch(e){}
 }
 function isDone(id){ return progress.done.includes(id); }
+
+// ---- Serbest mod: en yüksek seri (streak) rekoru — kalıcı, localStorage'da
+// saklanır. Oturum içi state.streak sıfırlanabilir/kapanışta kaybolur; bu
+// değer ise şimdiye kadar ulaşılan en yüksek seriyi kalıcı olarak tutar. ----
+let bestStreak = 0;
+try{ bestStreak = parseInt(localStorage.getItem("porte_best_streak") || "0", 10) || 0; }catch(e){}
+function saveBestStreak(){
+  try{ localStorage.setItem("porte_best_streak", String(bestStreak)); }catch(e){}
+}
+function updateBestStreakDisplay(){
+  const el = document.getElementById("streakBestNum");
+  if(el) el.textContent = bestStreak;
+}
+function registerStreak(current){
+  if(current > bestStreak){
+    bestStreak = current;
+    saveBestStreak();
+  }
+  updateBestStreakDisplay();
+}
+
+// ---- İlerleme sıfırlama: Ayarlar ekranındaki düğme ile tetiklenir.
+// Tamamlanan tüm dersleri (nota okuma müfredatı + piyano dersleri, ikisi de
+// aynı progress.done listesinde tutuluyor) ve en yüksek seri rekorunu
+// sıfırlar; Ayarlar'daki ses/ipucu tercihlerine ve Geliştirici Anahtarı'na
+// dokunmaz — kullanıcı sadece öğrenme ilerlemesini baştan başlatmak istiyor,
+// tercihlerini kaybetmek istemiyor. ----
+function resetAllProgress(){
+  progress = { done: [] };
+  saveProgress();
+  bestStreak = 0;
+  saveBestStreak();
+  updateBestStreakDisplay();
+  state.streak = 0;
+  const streakNumEl = document.getElementById("streakNum");
+  if(streakNumEl) streakNumEl.textContent = "0";
+  renderLessonList();
+  if(typeof renderPianoCurric === "function") renderPianoCurric();
+}
 
 // ---- Uygulama ayarları (Ayarlar ekranı üzerinden değiştirilebilir,
 // localStorage'da saklanır): şu an tek ayar, doğru cevapta piyano
@@ -4781,6 +4857,35 @@ wireSegmented("soundSeg", "sound", setNoteSound);
 setNoteSound(appSettings.noteSound);
 document.getElementById("openSettings").addEventListener("click", ()=> switchScreen("screenSettings"));
 
+// ---- İlerlemeyi sıfırla düğmesi: yanlışlıkla tek dokunuşla tüm ilerlemeyi
+// silmemek için iki aşamalı onay — ilk tıklama düğmeyi "Emin misin?" haline
+// getirir, 4sn içinde ikinci tıklama gelirse gerçekten sıfırlar; gelmezse
+// düğme kendiliğinden eski haline döner. ----
+(function wireResetProgress(){
+  const btn = document.getElementById("settingsResetBtn");
+  if(!btn) return;
+  let confirming = false, revertTimer = null;
+  btn.addEventListener("click", ()=>{
+    if(!confirming){
+      confirming = true;
+      btn.textContent = "Emin misin?";
+      btn.classList.add("confirming");
+      revertTimer = setTimeout(()=>{
+        confirming = false;
+        btn.textContent = "Sıfırla";
+        btn.classList.remove("confirming");
+      }, 4000);
+      return;
+    }
+    clearTimeout(revertTimer);
+    confirming = false;
+    resetAllProgress();
+    btn.classList.remove("confirming");
+    btn.textContent = "Sıfırlandı ✓";
+    setTimeout(()=>{ btn.textContent = "Sıfırla"; }, 1500);
+  });
+})();
+
 function openDurationTheory(){
   document.getElementById("theoryTitle").textContent = "Nota süreleri nedir?";
   const svg = document.getElementById("staffTheory");
@@ -6171,6 +6276,7 @@ function showPianoLessonResult(){
 document.getElementById("goPianoCurric").addEventListener("click", ()=>{ renderPianoCurric(); switchScreen("screenPianoCurric"); });
 document.querySelectorAll("[data-piano-curric]").forEach(b=> b.addEventListener("click", ()=>{ renderPianoCurric(); switchScreen("screenPianoCurric"); }));
 
+updateBestStreakDisplay();
 switchScreen("screenHome");
 
 // ================= PİYANO: pencere yeniden boyutlanınca ölçeklendir =================
